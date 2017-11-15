@@ -13,6 +13,9 @@ def brute_read(sheet, offset):
     return [t for t in [[fix_val(s.value) for s in t if s.value] for t in sheet.iter_rows(row_offset=offset)] if len(t) > 0]
 
 
+def fix_electorate(s):
+    return s.rsplit('(', 1)[0]
+
 def scrape_participation_aspect(sheet, aspect):
     rows = brute_read(sheet, 5)
     header = rows[0]
@@ -54,12 +57,49 @@ def scrape_participation(fname):
 
 
 def scrape_response(fname):
-    pass
+    wb = openpyxl.load_workbook(fname)
+    sheet = wb.get_sheet_by_name('Table 2')
+    rows = brute_read(sheet, 6)
+    header = rows[0]
+    rows = rows[1:]
+
+    obj = defaultdict(lambda: defaultdict(lambda: defaultdict(lambda: defaultdict(dict))))
+
+    current_state = None
+    header = []
+    topics = ['Yes', 'No', 'Total', 'Response clear', 'Response not clear', 'Non-responding', 'Total']
+    for topic in topics:
+        for aspect in ['count', '%']:
+            header.append((topic, aspect))
+    for row in rows:
+        if len(row) == 1:
+            if row[0].endswith(' Divisions'):
+                current_state = row[0].rsplit(' ', 1)[0]
+                continue
+            else:
+                break
+        row_type = 'Electorate'
+        if row[0].endswith('(Total)'):
+            row_type = 'State'
+        target = fix_electorate(row[0])
+
+        for (topic, aspect), value in zip(header, row[1:]):
+            if row_type == 'Electorate':
+                obj[row_type][current_state][target][topic][aspect] = value
+            else:
+                obj[row_type][target][topic][aspect] = value
+
+    def dump_elem(elem):
+        with open('output/response/By %s.json' % (elem), 'w') as fd:
+            json.dump(obj[elem], fd, indent=4, separators=(',', ': '))
+
+    dump_elem('State')
+    dump_elem('Electorate')
 
 
 def main():
-    scrape_participation('data/xlsx/participation.xlsx')
-    scrape_response('data/xlsx/participation.xlsx')
+    # scrape_participation('data/xlsx/participation.xlsx')
+    scrape_response('data/xlsx/response.xlsx')
     pass
 
 
