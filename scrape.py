@@ -14,19 +14,16 @@ def brute_read(sheet, offset):
 
 
 def fix_electorate(s):
-    return s.rsplit('(', 1)[0]
+    return s.rsplit('(', 1)[0].strip()
 
-def scrape_participation_aspect(sheet, aspect):
+
+def scrape_participation_aspect(electorate_obj, state_obj, sheet, aspect):
     rows = brute_read(sheet, 5)
     header = rows[0]
     rows = rows[1:]
 
-    obj = defaultdict(lambda: defaultdict(lambda: defaultdict(dict)))
-
-    def add_data(element, current_state, current_electorate, data):
-        obj[element][current_state][current_electorate].update(data)
-
     current_state = None
+    target = None
     for row in rows:
         if len(row) == 1:
             if row[0].endswith(' Divisions'):
@@ -36,24 +33,33 @@ def scrape_participation_aspect(sheet, aspect):
                 break
         if row[1] == 'Total participants':
             current_electorate = row[0]
-            add_data(row[1], current_state, current_electorate, zip(header, row[2:]))
+            if current_electorate.endswith('(Total)'):
+                target = "state"
+            else:
+                target = "electorate"
+            current_electorate = fix_electorate(current_electorate)
+            row = row[1:]
+
+        attr = row[0]
+        if target == "electorate":
+            target_dict = electorate_obj[current_state][current_electorate][aspect]
         else:
-            add_data(row[0], current_state, current_electorate, zip(header, row[1:]))
-
-    def dump_elem(elem):
-        with open('output/participation/%s - %s.json' % (aspect, elem), 'w') as fd:
-            json.dump(obj[elem], fd, indent=4, separators=(',', ': '))
-
-    dump_elem('Total participants')
-    dump_elem('Eligible participants')
-    dump_elem('Participation rate (%)')
+            target_dict = state_obj[current_state][aspect]
+        for k, v in zip(header, row[1:]):
+            target_dict[k][attr] = v
 
 
 def scrape_participation(fname):
     wb = openpyxl.load_workbook(fname)
-    scrape_participation_aspect(wb.get_sheet_by_name("Table 4"), "All")
-    scrape_participation_aspect(wb.get_sheet_by_name("Table 5"), "Male")
-    scrape_participation_aspect(wb.get_sheet_by_name("Table 6"), "Female")
+    electorate_obj = defaultdict(lambda: defaultdict(lambda: defaultdict(lambda: defaultdict(dict))))
+    state_obj = defaultdict(lambda: defaultdict(lambda: defaultdict(lambda: defaultdict(dict))))
+    scrape_participation_aspect(electorate_obj, state_obj, wb.get_sheet_by_name("Table 4"), "All")
+    scrape_participation_aspect(electorate_obj, state_obj, wb.get_sheet_by_name("Table 5"), "Male")
+    scrape_participation_aspect(electorate_obj, state_obj, wb.get_sheet_by_name("Table 6"), "Female")
+    with open('output/participation/By State.json', 'w') as fd:
+        json.dump(state_obj, fd, indent=4, separators=(',', ': '))
+    with open('output/participation/By Electorate.json', 'w') as fd:
+        json.dump(electorate_obj, fd, indent=4, separators=(',', ': '))
 
 
 def scrape_response(fname):
@@ -98,7 +104,7 @@ def scrape_response(fname):
 
 
 def main():
-    # scrape_participation('data/xlsx/participation.xlsx')
+    scrape_participation('data/xlsx/participation.xlsx')
     scrape_response('data/xlsx/response.xlsx')
     pass
 
