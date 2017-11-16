@@ -5,6 +5,11 @@ from collections import defaultdict
 import json
 
 
+def dump(fname, obj):
+    with open(fname, 'w') as fd:
+        json.dump(obj, fd, indent=4, separators=(',', ': '), sort_keys=True)
+
+
 def fix_val(v):
     return v
 
@@ -56,10 +61,8 @@ def scrape_participation(fname):
     scrape_participation_aspect(electorate_obj, state_obj, wb.get_sheet_by_name("Table 4"), "All")
     scrape_participation_aspect(electorate_obj, state_obj, wb.get_sheet_by_name("Table 5"), "Male")
     scrape_participation_aspect(electorate_obj, state_obj, wb.get_sheet_by_name("Table 6"), "Female")
-    with open('output/participation/By State.json', 'w') as fd:
-        json.dump(state_obj, fd, indent=4, separators=(',', ': '))
-    with open('output/participation/By Electorate.json', 'w') as fd:
-        json.dump(electorate_obj, fd, indent=4, separators=(',', ': '))
+    dump('output/participation/By State.json', state_obj)
+    dump('output/participation/By Electorate.json', electorate_obj)
 
 
 def scrape_response(fname):
@@ -96,8 +99,7 @@ def scrape_response(fname):
                 obj[row_type][target][topic][aspect] = value
 
     def dump_elem(elem):
-        with open('output/response/By %s.json' % (elem), 'w') as fd:
-            json.dump(obj[elem], fd, indent=4, separators=(',', ': '))
+        dump('output/response/By %s.json' % (elem), obj[elem])
 
     dump_elem('State')
     dump_elem('Electorate')
